@@ -1,0 +1,51 @@
+[project]
+name = "fastapi-telemetry"
+version = "0.0.1"
+description = "Prometheus metrics middleware, circuit breaker listener, and metric helpers for FastAPI — zero project-specific dependencies"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Aleksandar Krsteski", email = "acikabubo@gmail.com" },
+]
+keywords = ["fastapi", "prometheus", "metrics", "circuit-breaker", "middleware", "observability"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: FastAPI",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: System :: Monitoring",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+prometheus = [
+    "prometheus-client>=0.20.0",
+]
+pybreaker = [
+    "pybreaker>=1.2.0",
+]
+all = [
+    "prometheus-client>=0.20.0",
+    "pybreaker>=1.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/acikabubo/fastapi-telemetry"
+Repository = "https://github.com/acikabubo/fastapi-telemetry"
+Issues = "https://github.com/acikabubo/fastapi-telemetry/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fastapi_telemetry"]
