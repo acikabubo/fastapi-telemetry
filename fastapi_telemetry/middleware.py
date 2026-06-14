@@ -4,18 +4,18 @@ Prometheus HTTP metrics middleware.
 Tracks request counts, durations, and in-progress requests via injectable
 callbacks so the middleware has no dependency on any app-specific metrics
 facade.
+
+Implemented as a pure ASGI middleware (not ``BaseHTTPMiddleware``) to avoid
+buffering streaming responses in memory.
 """
 
 import time
 from collections.abc import Callable
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 
-class PrometheusMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
+class PrometheusMiddleware:
     """
     ASGI middleware that records Prometheus HTTP metrics.
 
@@ -52,45 +52,43 @@ class PrometheusMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
         request_end_callback: Callable[[str, str, int, float], None] | None = None,
         error_callback: Callable[[str, str], None] | None = None,
     ) -> None:
-        """Initialise the middleware with optional metric callbacks."""
-        super().__init__(app)
+        self.app = app
         self._on_start = request_start_callback
         self._on_end = request_end_callback
         self._on_error = error_callback
 
-    async def dispatch(self, request: Request, call_next: ASGIApp) -> Response:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """
         Process the request and invoke metric callbacks.
 
-        Args:
-            request: Incoming HTTP request.
-            call_next: Next middleware or endpoint handler.
-
-        Returns:
-            HTTP response from the endpoint.
+        Non-HTTP scopes (WebSocket, lifespan) are passed through unchanged.
         """
-        method = request.method
-        path = request.url.path
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope["method"]
+        path = scope["path"]
 
         if self._on_start:
             self._on_start(method, path)
 
-        start = time.time()
+        status_code = 500
+
+        async def send_wrapper(message: dict) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+
+        start = time.monotonic()
         try:
-            response = await call_next(request)
-            duration = time.time() - start
-
+            await self.app(scope, receive, send_wrapper)
             if self._on_end:
-                self._on_end(method, path, response.status_code, duration)
-
-            return response
-
+                self._on_end(method, path, status_code, time.monotonic() - start)
         except Exception as exc:
-            duration = time.time() - start
-
             if self._on_end:
-                self._on_end(method, path, 500, duration)
+                self._on_end(method, path, 500, time.monotonic() - start)
             if self._on_error:
                 self._on_error(type(exc).__name__, path)
-
-            raise exc
+            raise

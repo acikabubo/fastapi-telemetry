@@ -1,37 +1,24 @@
 """Tests for get_or_create_counter/gauge/histogram helpers."""
 
 import pytest
-from prometheus_client import REGISTRY, Counter, Gauge, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 from fastapi_telemetry import get_or_create_counter, get_or_create_gauge, get_or_create_histogram
+from fastapi_telemetry.helpers import _clear_registry
 
-
-def _unregister(*names: str) -> None:
-    """Remove metrics from the registry so tests are isolated."""
-    for name in names:
-        collector = REGISTRY._names_to_collectors.get(name)
-        if collector:
-            try:
-                REGISTRY.unregister(collector)
-            except Exception:
-                pass
+_TEST_NAMES = (
+    "test_counter_total",
+    "test_gauge",
+    "test_histogram",
+    "test_labeled_counter_total",
+)
 
 
 @pytest.fixture(autouse=True)
 def _cleanup() -> None:
-    _unregister(
-        "test_counter_total",
-        "test_gauge",
-        "test_histogram",
-        "test_labeled_counter_total",
-    )
+    _clear_registry(*_TEST_NAMES)
     yield
-    _unregister(
-        "test_counter_total",
-        "test_gauge",
-        "test_histogram",
-        "test_labeled_counter_total",
-    )
+    _clear_registry(*_TEST_NAMES)
 
 
 def test_creates_counter() -> None:
